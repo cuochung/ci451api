@@ -59,7 +59,7 @@ class GeneralController extends BaseController
         //判斷資料是否包含合法的token
         $isValid = $this->checkToken($dbName);
         // $isValid = true;
-        
+
         if (!$isValid){
             // echo 'Auth not Allow!!';
             $response = [
@@ -138,6 +138,29 @@ class GeneralController extends BaseController
             'personnel_id' => '12345',
             'token' =>$token,
             'created_at' => Carbon::now('Asia/Taipei')
+        ];
+
+        $insertId = $this->GeneralModel->insert($data);
+        if ($insertId) {
+            echo "Data inserted successfully. Insert ID: $insertId";
+        } else {
+            echo "Failed to insert data.";
+        }
+    }
+
+    //新增測試用資料
+    function  addTestData($dbName, $tableName)
+    {
+        $this->loadDatabase($dbName, $tableName);
+
+        //設定 allowedFields
+        $this->GeneralModel->setAllowedFields(['account','password', 'username']);
+
+        // $token = bin2hex(openssl_random_pseudo_bytes(65));
+        $data = [
+            'account' => 'test123',
+            'username' => 'Test Man 123',
+            'password' => 'test123',
         ];
 
         $insertId = $this->GeneralModel->insert($data);
