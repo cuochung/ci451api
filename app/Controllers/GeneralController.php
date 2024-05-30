@@ -130,12 +130,12 @@ class GeneralController extends BaseController
         $this->loadDatabase($dbName, $tableName);
 
         //設定 allowedFields
-        $this->GeneralModel->setAllowedFields(['name', 'personnel_id', 'token', 'created_at']);
+        $this->GeneralModel->setAllowedFields(['name', 'personnel_snkey', 'token', 'created_at']);
 
         $token = bin2hex(openssl_random_pseudo_bytes(65));
         $data = [
             'name' => 'John Doe',
-            'personnel_id' => '12345',
+            'personnel_snkey' => '12345',
             'token' =>$token,
             'created_at' => Carbon::now('Asia/Taipei')
         ];

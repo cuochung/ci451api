@@ -47,10 +47,59 @@ class AuthController extends BaseController
         ->first();
 
         if ($userInfo){
-            echo 'match';
+            // echo 'match';
+            /*符合登入資格
+            1.建構token;->寫到 logined_tokens 表單裡
+            2.回傳 state, token
+            */
+            $token = bin2hex(openssl_random_pseudo_bytes(65));
+            $data = [
+                'name' => $userInfo['username'],
+                'personnel_snkey' => $userInfo['snkey'],
+                'token' =>$token,
+                'created_at' => Carbon::now('Asia/Taipei')
+            ];
+
+            $this->loadDatabase($dbName,'logined_tokens'); //取得 logined_tokens 表單 模型
+            $tokens = $this->GeneralModel;
+            $this->GeneralModel->setAllowedFields(['name', 'personnel_snkey', 'token', 'created_at']); //設置可存取欄位
+            $insertId = $tokens->insert($data); //新增
+            $results = [
+                'insertId'=>$insertId,
+                'state'=>1,
+                'token'=>$token,
+            ];
+
         }else{
-            echo 'no auth';
+            // echo 'no auth';
+            $results = [
+                'state'=>0,
+                'message'=>'no auth',
+            ];
         }
-        exit;
+        
+        return $this->response->setJSON($results);
+    }
+
+    /*登出*/
+    function logout($dbName){
+        $this->loadDatabase($dbName,'logined_tokens');
+
+        $token = $this->request->getHeaderLine('Authorization');
+
+        $check_token = $this->GeneralModel->where('token', $token)->first();
+        if ($check_token) {
+            $this->GeneralModel->where('token',$token)->delete();
+            $results = [
+                'state'=>1,
+                'message'=>'token deleted',
+            ];
+        }else{
+            $results = [
+                'state'=>0,
+                'message'=>'logout error',
+            ];
+        }
+        return $this->response->setJSON($results);
     }
 }

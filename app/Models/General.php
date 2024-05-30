@@ -10,7 +10,7 @@ class General extends Model
     protected $primaryKey       = 'snkey';
     protected $allowedFields    = ['datalist'];
 
-    // protected $allowedFields    = ['name', 'personnel_id', 'token', 'created_at'];
+    // protected $allowedFields    = ['name', 'personnel_snkey', 'token', 'created_at'];
     // 自定义的构造函数来接受数据库连接和表名
     public function __construct($db = null, $table = null)
     {
