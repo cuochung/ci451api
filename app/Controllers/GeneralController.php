@@ -50,6 +50,30 @@ class GeneralController extends BaseController
         $this->GeneralModel = new General($db, $tableName);
     }
 
+    //判斷token的合法性
+    function checkToken($dbName){
+        $this->loadDatabase($dbName, 'logined_tokens');
+
+        $token = $this->request->getHeaderLine('Authorization');
+
+        $check_token = $this->GeneralModel->asObject()->where('token', $token)->first();
+
+        if (!$check_token) {
+            return false;
+        }else{
+            $DiffMins = Carbon::createFromFormat('Y-m-d H:i:s', $check_token->created_at, 'Asia/Taipei')->diffInMinutes(Carbon::now('Asia/Taipei'));
+            
+            if ($DiffMins > 15){
+                // echo 'over 15 min -> 刪除';exit;
+                // $this->GeneralModel->where('token',$token)->delete(); //2024.5.31 先不刪除,透過重新登入更換時間
+                return false;
+            }else{
+                // echo '小於 15 min';exit;
+                return true;
+            }
+        }
+    }
+
     /*取得全部資料
         $dbName 數據庫名 
         $tableName 表單名
@@ -61,34 +85,17 @@ class GeneralController extends BaseController
         // $isValid = true;
 
         if (!$isValid){
-            // echo 'Auth not Allow!!';
             $response = [
                 'status' => 401,
-                'message' => '存取因遺失訂用帳戶密鑰而遭拒。對 API 提出要求時，請務必包含訂用帳戶密鑰。'
+                'message' => '存取因遺失訂用帳戶密鑰而遭拒或密鑰過期遭刪除。對 API 提出要求時，請務必包含訂用帳戶密鑰。'
             ];
-
-            // 使用 response() 助手返回 JSON 格式響應
-            return $this->response->setJSON($response);
+            return $this->response->setJSON($response); // 使用 response() 助手返回 JSON 格式響應
         }else{
             $this->loadDatabase($dbName, $tableName);
             $results = $this->GeneralModel->findAll(); //取得所有資料
             return $this->response->setJSON($results);
         }
         
-    }
-
-    //判斷token的合法性
-    function checkToken($dbName){
-        $this->loadDatabase($dbName, 'logined_tokens');
-
-        $token = $this->request->getHeaderLine('Authorization');
-        $check_token = $this->GeneralModel->asObject()->where('token', $token)->first();
-
-        if (!$check_token) {
-            return false;
-        }else{
-            return true;
-        }
     }
 
 
@@ -119,9 +126,119 @@ class GeneralController extends BaseController
         print_r($results);
     }
 
-    function add()
+    //新增資料
+    function addHandler($dbName, $tableName)
     {
-        echo 'run add';
+        //判斷資料是否包含合法的token
+        $isValid = $this->checkToken($dbName);
+        // $isValid = true;
+
+        if (!$isValid){
+            $response = [
+                'status' => 401,
+                'message' => '存取因遺失訂用帳戶密鑰而遭拒或密鑰過期遭刪除。對 API 提出要求時，請務必包含訂用帳戶密鑰。'
+            ];
+            return $this->response->setJSON($response); // 使用 response() 助手返回 JSON 格式響應
+        }else{
+            $this->loadDatabase($dbName, $tableName);
+            $this->GeneralModel->setAllowedFields(['title', 'content']);
+            $data = $this->request->getVar();
+            $insertID = $this->GeneralModel->insert($data); //取得所有資料
+
+            if ($insertID){
+                $results = [
+                    'state'=>1,
+                    'insertID'=>$insertID,
+                    'active'=>'add'
+                ];
+            }else{
+                $results = [
+                    'state'=>0,
+                    'active'=>'add',
+                    'message'=>'add process error'
+                ];
+            }
+
+            return $this->response->setJSON($results);
+        }
+    }
+
+    //修改資料
+    function editHandler($dbName, $tableName)
+    {
+        //判斷資料是否包含合法的token
+        $isValid = $this->checkToken($dbName);
+        // $isValid = true;
+
+        if (!$isValid){
+            $response = [
+                'status' => 401,
+                'message' => '存取因遺失訂用帳戶密鑰而遭拒或密鑰過期遭刪除。對 API 提出要求時，請務必包含訂用帳戶密鑰。'
+            ];
+            return $this->response->setJSON($response); // 使用 response() 助手返回 JSON 格式響應
+        }else{
+            $this->loadDatabase($dbName, $tableName);
+            $this->GeneralModel->setAllowedFields(['title', 'content','updateTime']);
+            $data = $this->request->getVar();
+            $data['updateTime'] = Carbon::now('Asia/Taipei');
+            
+            $optionRS = $this->GeneralModel->where('snkey',$data['snkey'])
+                ->set($data)
+                ->update();
+
+            if ($optionRS){
+                $results = [
+                    'state'=>1,
+                    'active'=>'edit'
+                ];
+            }else{
+                $results = [
+                    'state'=>0,
+                    'active'=>'edit',
+                    'message'=>'edit process error'
+                ];
+            }
+
+            return $this->response->setJSON($results);
+        }
+    }
+
+    //刪除資料
+    function delHandler($dbName, $tableName)
+    {
+        //判斷資料是否包含合法的token
+        $isValid = $this->checkToken($dbName);
+        // $isValid = true;
+
+        if (!$isValid){
+            $response = [
+                'status' => 401,
+                'message' => '存取因遺失訂用帳戶密鑰而遭拒或密鑰過期遭刪除。對 API 提出要求時，請務必包含訂用帳戶密鑰。'
+            ];
+            return $this->response->setJSON($response); // 使用 response() 助手返回 JSON 格式響應
+        }else{
+            $this->loadDatabase($dbName, $tableName);
+            $this->GeneralModel->setAllowedFields(['title', 'content','updateTime']);
+            $data = $this->request->getVar();
+            $data['updateTime'] = Carbon::now('Asia/Taipei');
+
+            $optionRS = $this->GeneralModel->where('snkey',$data['snkey'])->delete();
+
+            if ($optionRS){
+                $results = [
+                    'state'=>1,
+                    'active'=>'delete'
+                ];
+            }else{
+                $results = [
+                    'state'=>0,
+                    'active'=>'delete',
+                    'message'=>'delete process error'
+                ];
+            }
+
+            return $this->response->setJSON($results);
+        }
     }
 
     //新增測試用token

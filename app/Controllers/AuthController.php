@@ -38,46 +38,65 @@ class AuthController extends BaseController
     */
     function loginHandler($dbName){
         $this->loadDatabase($dbName,'users');
-
+        
         //判斷account password 有沒有都符合
-        $users = $this->GeneralModel;
+        $users = $this->GeneralModel; //取得 users 表單模型
         $userInfo = $users
         ->where('account', $this->request->getVar('account'))
         ->where('password', $this->request->getVar('password'))
         ->first();
 
-        if ($userInfo){
+        if ($userInfo){ //符合登入資格
+            $token = bin2hex(openssl_random_pseudo_bytes(65));
             // echo 'match';
-            /*符合登入資格
-            1.建構token;->寫到 logined_tokens 表單裡
+            /*
+            1.判斷 personnel_snkey 在 logined_tokens 是否存在 token
+                不存在-> 新增到 logined_tokens 表單裡
+                存在-> 更新 token,登入時間
             2.回傳 state, token
             */
-            $token = bin2hex(openssl_random_pseudo_bytes(65));
-            $data = [
-                'name' => $userInfo['username'],
-                'personnel_snkey' => $userInfo['snkey'],
-                'token' =>$token,
-                'created_at' => Carbon::now('Asia/Taipei')
-            ];
 
             $this->loadDatabase($dbName,'logined_tokens'); //取得 logined_tokens 表單 模型
-            $tokens = $this->GeneralModel;
-            $this->GeneralModel->setAllowedFields(['name', 'personnel_snkey', 'token', 'created_at']); //設置可存取欄位
-            $insertId = $tokens->insert($data); //新增
-            $results = [
-                'insertId'=>$insertId,
-                'state'=>1,
-                'token'=>$token,
-            ];
+            $tokens = $this->GeneralModel; //取得 logined_tokens 表單模型
+            $isOldTokenExists = $tokens->asObject()
+                ->where('personnel_snkey',$userInfo['snkey'])
+                ->first();
+            
 
-        }else{
+            $this->GeneralModel->setAllowedFields(['name', 'personnel_snkey', 'token', 'created_at']); //設置可存取欄位
+            if (!$isOldTokenExists){ //未存在的 userInfo -> 新增 logined_tokens 資料
+                $insertId = $tokens->insert([
+                    'name' => $userInfo['username'],
+                    'personnel_snkey' => $userInfo['snkey'],
+                    'token' =>$token,
+                    'created_at' => Carbon::now('Asia/Taipei')
+                ]); //新增
+
+                $results = [
+                    'state'=>1,
+                    'insertId'=>$insertId,
+                    'token'=>$token,
+                    'active'=>'insert'
+                ];
+            }else{ //已存在的 userInfo -> 更新 logined_tokens 資料
+                $tokens->where('personnel_snkey',$userInfo['snkey'])
+                ->set(['token'=>$token,'created_at'=>Carbon::now('Asia/Taipei')])
+                ->update();
+
+                $results = [
+                    'state'=>1,
+                    'token'=>$token,
+                    'active'=>'update'
+                ];
+            }
+        }else{ //未符合登入資料
             // echo 'no auth';
             $results = [
                 'state'=>0,
                 'message'=>'no auth',
             ];
         }
-        
+
         return $this->response->setJSON($results);
     }
 
@@ -89,10 +108,10 @@ class AuthController extends BaseController
 
         $check_token = $this->GeneralModel->where('token', $token)->first();
         if ($check_token) {
-            $this->GeneralModel->where('token',$token)->delete();
+            // $this->GeneralModel->where('token',$token)->delete(); //2024.5.31 先不刪除,透過重新登入更換時間
             $results = [
                 'state'=>1,
-                'message'=>'token deleted',
+                'message'=>'token not deleted,just logout',
             ];
         }else{
             $results = [
