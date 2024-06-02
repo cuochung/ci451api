@@ -5,3 +5,9 @@
 4.處理搜尋都用Json語法處理
 5.使用PHPMailer處理Mail功能
 6.上傳功能
+
+2024.6.2
+1.Mail功能的部分,目前有兩個方式寄件
+(1)PHPmailer ,設定檔依.env裡為主,目前以https://mailtrap.io/ ;當測試
+(2)gmail, 設定檔依 app/config/email.php裡的設定為主
+透過gmail smtp寄送信件時,無法指定寄件者,會依使用的gmail帳號當寄件人

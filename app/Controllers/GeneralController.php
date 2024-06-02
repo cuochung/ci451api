@@ -13,6 +13,7 @@ header("Access-Control-Allow-Headers: Content-type,Authorization");
 class GeneralController extends BaseController
 {
     protected $GeneralModel;
+    protected $helpers = ['CIMail'];
 
     // public function index($dbName, $tableName)
     // {
@@ -240,6 +241,162 @@ class GeneralController extends BaseController
             return $this->response->setJSON($results);
         }
     }
+
+    //寄發email ;透過phpmailer
+    function sendMail($dbName){
+        $isValid = $this->checkToken($dbName); //(一樣需要通過token授權才可以寄送)
+
+        if (!$isValid){
+            $response = [
+                'status' => 401,
+                'message' => '存取因遺失訂用帳戶密鑰而遭拒或密鑰過期遭刪除。對 API 提出要求時，請務必包含訂用帳戶密鑰。'
+            ];
+            return $this->response->setJSON($response); // 使用 response() 助手返回 JSON 格式響應
+        }else{
+            //先設定樣本用的userinfo
+            $user_info = [
+                'name'=>'TEST Fake Man',
+                'email'=>'pddtvgame@hotmail.com.tw'
+            ];
+
+            $mail_data = array(
+                // 'actionLink'=> $actionLink,
+                'user'=>$user_info
+            );
+
+            $view = \Config\Services::renderer();
+            //暫存使用sample版型寄送信件內容 sample-email-template
+            $mail_body= $view->setVar('mail_data', $mail_data)->render('email-templates/sample-email-template');
+
+            $mailConfig = array(
+                'mail_from_email'=>env('EMAIL_FROM_ADDRESS'),
+                'mail_from_name'=>env('EMAIL_FROM_NAME'),
+                'mail_recipient_email'=>$user_info['email'],
+                'mail_recipient_name'=> $user_info['name'],
+                'mail_subject'=>'Test Mail',
+                'mail_body'=>$mail_body
+            );
+
+            if (sendEmail($mailConfig)){
+                $results = [
+                    'state'=>1,
+                    'active'=>'sendmail',
+                    'message'=>'Email寄件成功'
+                ];
+            }else{
+                $results = [
+                    'state'=>0,
+                    'active'=>'sendmail',
+                    'message'=>'Email寄件失敗'
+                ];
+            }
+
+            return $this->response->setJSON($results);
+        }
+    }
+
+    //寄發email 透過gmail
+    function sendMailByGmail($dbName){
+        $isValid = $this->checkToken($dbName); //(一樣需要通過token授權才可以寄送)
+
+        if (!$isValid){
+            $response = [
+                'status' => 401,
+                'message' => '存取因遺失訂用帳戶密鑰而遭拒或密鑰過期遭刪除。對 API 提出要求時，請務必包含訂用帳戶密鑰。'
+            ];
+            return $this->response->setJSON($response); // 使用 response() 助手返回 JSON 格式響應
+        }else{
+            //先設定樣本用的userinfo
+            $user_info = [
+                'name'=>'TEST Fake Man',
+                'email'=>'pdd2011@hotmail.com.tw'
+            ];
+
+            $mail_data = array(
+                // 'actionLink'=> $actionLink,
+                'user'=>$user_info
+            );
+
+            $view = \Config\Services::renderer();
+            //暫存使用sample版型寄送信件內容 sample-email-template
+            $mail_body= $view->setVar('mail_data', $mail_data)->render('email-templates/sample-email-template');
+
+            $email = \Config\Services::email();
+            //透過gmail smtp寄送信件時,無法指定寄件者,會依使用的gmail帳號當寄件人
+            $email->setFrom('cuochung@gmail.com', 'PDD_CI451_TEST');
+            $email->setTo($user_info['email']);
+            $email->setSubject('Test Subject');
+            $email->setMessage($mail_body);
+
+            if ($email->send()) {
+                $results = [
+                    'state'=>1,
+                    'active'=>'sendmail by gmail',
+                    'message'=>'Email寄件成功'
+                ];
+            }else{
+                $results = [
+                    'state'=>0,
+                    'active'=>'sendmail by gmail',
+                    'message'=>'Email寄件失敗'
+                ];
+            }
+
+            return $this->response->setJSON($results);
+        }
+    }
+
+
+    //多筆上傳 $database是資料庫中的 table 名 = 存檔的目錄名
+	function fileUploadMulti($dbName,$database) 
+	{   
+        $isValid = $this->checkToken($dbName); //(一樣需要通過token授權才可以上傳)
+
+        if (!$isValid){
+            $response = [
+                'status' => 401,
+                'message' => '存取因遺失訂用帳戶密鑰而遭拒或密鑰過期遭刪除。對 API 提出要求時，請務必包含訂用帳戶密鑰。'
+            ];
+            return $this->response->setJSON($response); // 使用 response() 助手返回 JSON 格式響應
+        }else{
+            // $model = new GeneralModel(); //載入指定Model
+            $uploadPath = FCPATH .'upload';  //設定上傳暫存檔案位置
+            $data = $this->request->getPost(); //取得資料用
+            $files = $this->request->getFiles(); //取得上傳的檔案
+
+            foreach($files['files'] as $fileInfo) {
+                //取得副檔名及建構檔名
+                $newName = $fileInfo->getRandomName(); //設定新檔名
+
+                //上傳及縮圖
+                $image = \Config\Services::image()
+                ->withFile($fileInfo)
+                ->resize(480, 480, true, 'height');
+                
+                if ($image->save($uploadPath .'/'.$database.'/'. $newName)){
+                    //將新檔名放入 result 陣列
+                    $result = [
+                        'state'=> 1,
+                        'active'=>'upload',
+                        'message'=>'upload success',
+                        'picName' => $newName,
+                        'picOriginalName' => $fileInfo-> getName(),
+                    ];
+                }else{
+                    $result = [
+                        'state'=> 0,
+                        'active'=>'upload',
+                        'message'=>'upload success',
+                        'picOriginalName' => $fileInfo-> getName(),
+                    ];
+                }
+            
+            }
+		    return $this->response->setJSON($result); //回傳建構檔案名稱
+        }
+
+		
+	}
 
     //新增測試用token
     function  addTestToken($dbName, $tableName)
